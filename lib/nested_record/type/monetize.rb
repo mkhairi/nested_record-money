@@ -40,10 +40,11 @@ class NestedRecord::Type
         elsif value.is_a?(String)
           # Form input in major units. Monetize.parse reads "abc" as 0 and
           # "USD 12" as USD, so reject both instead of storing them.
+          # ponytail: "US$12" still reads as MYR; reject any other letters if that matters.
           return nil unless value.match?(/\d/)
 
-          money = value.to_money(currency)
-          return money if money.currency == ::Money::Currency.wrap(currency)
+          money = ::Monetize.parse(value.upcase, currency, assume_from_symbol: true)
+          return money if money&.currency == ::Money::Currency.wrap(currency)
         elsif value.respond_to?(:to_money)
           return value.to_money(currency)
         end
@@ -56,12 +57,15 @@ class NestedRecord::Type
       return nil if value.nil?
 
       if value.is_a?(String)
+        # A stored digit String reads as cents, like a stored Integer.
+        cents = Integer(value, 10, exception: false)
+        return cast(cents) if cents
+
         begin
-          # A stored digit String decodes to an Integer, so it reads as cents.
           parsed = ActiveSupport::JSON.decode(value)
-          return cast(parsed) if parsed.is_a?(Hash) || parsed.is_a?(Integer)
+          return cast(parsed) if parsed.is_a?(Hash)
         rescue JSON::ParserError
-          # Not JSON: cast the raw String below.
+          # Not JSON. Like a decoded non-Hash, it falls through to cast below.
         end
       end
 

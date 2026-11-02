@@ -30,14 +30,32 @@ RSpec.describe NestedRecord::Type::Monetize do
       expect(type.cast('USD 12')).to be_nil
     end
 
+    it 'returns nil for a lowercase code or a foreign symbol' do
+      expect(type.cast('usd 12')).to be_nil
+      expect(type.cast('12 sgd')).to be_nil
+      expect(type.cast('$12')).to be_nil
+    end
+
     it 'keeps a String that names the same currency' do
       expect(type.cast('MYR 12')).to eq(Money.new(1200, 'MYR'))
+      expect(type.cast('RM 12')).to eq(Money.new(1200, 'MYR'))
+    end
+
+    it 'returns nil for a String Monetize cannot parse' do
+      expect(type.cast('1.2.3')).to be_nil
+      expect(type.cast('1-2')).to be_nil
     end
   end
 
   describe '#deserialize' do
     it 'reads a stored digit String as cents' do
       expect(type.deserialize('1500')).to eq(Money.new(1500, 'MYR'))
+      expect(type.deserialize('0012')).to eq(Money.new(12, 'MYR'))
+      expect(type.deserialize('-5')).to eq(Money.new(-5, 'MYR'))
+    end
+
+    it 'reads a stored decimal String as major units' do
+      expect(type.deserialize('15.0')).to eq(Money.new(1500, 'MYR'))
     end
 
     it 'reads the stored hash' do
