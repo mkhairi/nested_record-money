@@ -37,14 +37,16 @@ class NestedRecord::Type
         # For decimals, use monetize gem's to_money conversion (treats as dollars)
         if value.is_a?(Integer)
           return ::Money.new(value, currency)
+        elsif value.is_a?(String)
+          # Form input in major units. Monetize.parse reads "abc" as 0 and
+          # "USD 12" as USD, so reject both instead of storing them.
+          # ponytail: "US$12" still reads as MYR; reject any other letters if that matters.
+          return nil unless value.match?(/\d/)
+
+          money = ::Monetize.parse(value.upcase, currency, assume_from_symbol: true)
+          return money if money&.currency == ::Money::Currency.wrap(currency)
         elsif value.respond_to?(:to_money)
-          # Use monetize's conversion for decimal values
-          begin
-            return value.to_money(currency)
-          rescue NoMethodError, ::Monetize::ParseError
-            # Fallback: if to_money fails, try to convert to integer and treat as cents
-            return ::Money.new(value.to_i, currency) if value.respond_to?(:to_i)
-          end
+          return value.to_money(currency)
         end
       end
 
@@ -55,12 +57,15 @@ class NestedRecord::Type
       return nil if value.nil?
 
       if value.is_a?(String)
+        # A stored digit String reads as cents, like a stored Integer.
+        cents = Integer(value, 10, exception: false)
+        return cast(cents) if cents
+
         begin
           parsed = ActiveSupport::JSON.decode(value)
           return cast(parsed) if parsed.is_a?(Hash)
         rescue JSON::ParserError
-          # Try to parse as integer string
-          return cast(value.to_i) if value.match?(/\A\d+\z/)
+          # Not JSON. Like a decoded non-Hash, it falls through to cast below.
         end
       end
 

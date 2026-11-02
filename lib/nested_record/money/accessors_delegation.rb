@@ -11,6 +11,7 @@ module NestedRecord::Money::AccessorsDelegation
 
     # Delegate the money attribute
     delegate(attr_name)
+    delegate("#{attr_name}?")
     delegate1("#{attr_name}=")
 
     # Delegate currency attribute unless disabled
