@@ -32,7 +32,11 @@ end
 
 - Options: `currency:`, `default:`, `with:` (currency attribute name, `false` for none).
 - Stored as `{ "cents" => 1500, "currency_iso" => "MYR" }`.
-- Integers cast as cents. Decimals and strings cast through `to_money`.
+- Units: an Integer is cents (`default: 30` is 0.30). A String is major units (form input `"0.30"` is 0.30). A Float or BigDecimal is major units.
+- A String with no digits, or one naming another currency (`"USD 12"` on a MYR attribute), casts to `nil`.
+- A stored digit String (`"1500"`) reads as cents, like a stored Integer.
+- `with:` mirrors the currency of an assigned `Money` only. Casting uses `currency:` or `Money.default_currency`.
+- Unknown options raise `ArgumentError`. money-rails options such as `with_currency:` or `allow_nil:` are not supported.
 - `monetize` takes one field per call on a nested record.
 - On an ActiveRecord model, `monetize` is money-rails' own.
 

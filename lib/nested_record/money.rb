@@ -3,6 +3,11 @@
 require 'nested_record'
 require 'money-rails'
 
+unless NestedRecord::MacroRecorder.respond_to?(:register)
+  raise LoadError, 'nested_record-money needs NestedRecord::MacroRecorder.register ' \
+                   '(gem "nested_record", github: "mkhairi/nested_record", branch: "extensions")'
+end
+
 module NestedRecord::Money
   require 'nested_record/money/version'
   require 'nested_record/money/macro'
@@ -15,4 +20,6 @@ require 'nested_record/type/monetize'
 # ActiveRecord model keeps money-rails' own monetize for its columns.
 NestedRecord::Base.extend(NestedRecord::Money::Macro)
 NestedRecord::MacroRecorder.register(:monetize)
+# Concern built its delegators from MACROS at load, before register ran.
+NestedRecord::Concern.def_delegator :macro_recorder, :monetize
 NestedRecord::NestedAccessorsSetup.prepend(NestedRecord::Money::AccessorsDelegation)

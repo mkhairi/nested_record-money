@@ -8,6 +8,7 @@ module NestedRecord::Money::Macro
     name = fields.first
     currency = options.delete(:currency)
     default = options.delete(:default)
+    options.assert_valid_keys(:with)
 
     attribute_name = name.to_s
     currency_name = options[:with] || :"#{attribute_name}_currency"
