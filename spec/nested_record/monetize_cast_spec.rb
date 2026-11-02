@@ -58,6 +58,10 @@ RSpec.describe NestedRecord::Type::Monetize do
       expect(type.deserialize('15.0')).to eq(Money.new(1500, 'MYR'))
     end
 
+    it 'sees a stored null as changed against the default' do
+      expect(type.changed_in_place?(nil, Money.new(0, 'MYR'))).to be(true)
+    end
+
     it 'reads the stored hash' do
       expect(type.deserialize('{"cents":150,"currency_iso":"MYR"}')).to eq(Money.new(150, 'MYR'))
     end
@@ -82,7 +86,9 @@ RSpec.describe 'NestedRecord monetize macro' do
     end
 
     it 'makes the owner invalid when the String does not cast' do
-      expect(FeeOwner.new(gateway_fee: 'abc')).not_to be_valid
+      owner = FeeOwner.new(gateway_fee: 'abc')
+      expect(owner).not_to be_valid
+      expect(owner.errors.full_messages).to eq ['Fees gateway fee is not a number']
     end
   end
 
@@ -102,7 +108,9 @@ RSpec.describe 'NestedRecord monetize macro' do
     end
 
     it 'records the cast validation too' do
-      expect(ConcernOwner.new(gateway_fee: 'abc')).not_to be_valid
+      owner = ConcernOwner.new(gateway_fee: 'abc')
+      expect(owner).not_to be_valid
+      expect(owner.errors.full_messages).to eq ['Fees gateway fee is not a number']
     end
   end
 
@@ -129,13 +137,18 @@ RSpec.describe 'NestedRecord monetize macro' do
       expect(record.fee).to be_nil
     end
 
-    it 'accepts a String that casts' do
-      expect(FeeRecord.new(fee: '1.50')).to be_valid
+    it 'clears the error once a valid value is assigned' do
+      ['2.00', 200, Money.new(200, 'MYR')].each do |valid|
+        record = FeeRecord.new(fee: 'abc')
+        record.fee = valid
+        expect(record).to be_valid, "expected #{valid.inspect} to clear the error"
+      end
     end
 
-    it 'clears the error once a valid value is assigned' do
+    it 'restores the default when nil is assigned after a bad String' do
       record = FeeRecord.new(fee: 'abc')
-      record.fee = '2.00'
+      record.fee = nil
+      expect(record.fee).to eq(Money.new(0, 'MYR'))
       expect(record).to be_valid
     end
 
@@ -147,10 +160,6 @@ RSpec.describe 'NestedRecord monetize macro' do
 
     it 'applies the default for a missing key' do
       expect(FeeRecord.instantiate({}).fee).to eq(Money.new(0, 'MYR'))
-    end
-
-    it 'sees a stored null as changed against the default' do
-      expect(NestedRecord::Type::Monetize.new(currency: 'MYR').changed_in_place?(nil, Money.new(0, 'MYR'))).to be(true)
     end
 
     it 'bubbles the error to a has_one_nested owner' do
