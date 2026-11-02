@@ -80,6 +80,10 @@ RSpec.describe 'NestedRecord monetize macro' do
     it 'delegates the predicate' do
       expect(FeeOwner.new(gateway_fee: 0)).to respond_to(:gateway_fee?)
     end
+
+    it 'makes the owner invalid when the String does not cast' do
+      expect(FeeOwner.new(gateway_fee: 'abc')).not_to be_valid
+    end
   end
 
   describe 'inside a NestedRecord::Concern' do
@@ -95,6 +99,64 @@ RSpec.describe 'NestedRecord monetize macro' do
 
     it 'records and delegates monetize' do
       expect(ConcernOwner.new(gateway_fee: 150).gateway_fee).to eq(Money.new(150, 'MYR'))
+    end
+
+    it 'records the cast validation too' do
+      expect(ConcernOwner.new(gateway_fee: 'abc')).not_to be_valid
+    end
+  end
+
+  describe 'cast validation' do
+    nested_model(:FeeRecord) do
+      monetize :fee, currency: 'MYR', default: 0
+    end
+
+    active_model(:FeeHolder) do
+      has_one_nested :charges, class_name: 'FeeRecord'
+    end
+
+    it 'adds not_a_number when a non-blank String does not cast' do
+      %w[abc 1.2.3].push('USD 12').each do |input|
+        record = FeeRecord.new(fee: input)
+        expect(record).not_to be_valid, "expected #{input.inspect} to be invalid"
+        expect(record.errors.details[:fee]).to include(a_hash_including(error: :not_a_number, value: input))
+      end
+    end
+
+    it 'accepts a blank String as nil' do
+      record = FeeRecord.new(fee: '')
+      expect(record).to be_valid
+      expect(record.fee).to be_nil
+    end
+
+    it 'accepts a String that casts' do
+      expect(FeeRecord.new(fee: '1.50')).to be_valid
+    end
+
+    it 'clears the error once a valid value is assigned' do
+      record = FeeRecord.new(fee: 'abc')
+      record.fee = '2.00'
+      expect(record).to be_valid
+    end
+
+    it 'keeps a stored null as nil without an error' do
+      record = FeeRecord.instantiate('fee' => nil)
+      expect(record.fee).to be_nil
+      expect(record).to be_valid
+    end
+
+    it 'applies the default for a missing key' do
+      expect(FeeRecord.instantiate({}).fee).to eq(Money.new(0, 'MYR'))
+    end
+
+    it 'sees a stored null as changed against the default' do
+      expect(NestedRecord::Type::Monetize.new(currency: 'MYR').changed_in_place?(nil, Money.new(0, 'MYR'))).to be(true)
+    end
+
+    it 'bubbles the error to a has_one_nested owner' do
+      holder = FeeHolder.new(charges_attributes: { fee: 'abc' })
+      expect(holder).not_to be_valid
+      expect(holder.errors.attribute_names.map(&:to_s)).to include('charges.fee')
     end
   end
 end

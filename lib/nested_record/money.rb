@@ -10,6 +10,7 @@ end
 
 module NestedRecord::Money
   require 'nested_record/money/version'
+  require 'nested_record/money/cast_validator'
   require 'nested_record/money/macro'
   require 'nested_record/money/accessors_delegation'
 end
